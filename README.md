@@ -1,5 +1,7 @@
 # Reinforcement Learning Exercises
 
+More info on this project: https://www.miketerekhov.com/Pytux
+
 Two standalone reinforcement learning implementations from a Boston University senior-year RL coursework, covering the two major branches of the field: **dynamic programming on a known MDP** and **model-free control with function-free (tabular) Q-learning** in a simulated environment.
 
 | File | Topic | Technique |
