@@ -2,11 +2,12 @@
 
 More info on this project: https://www.miketerekhov.com/Pytux
 
-Two standalone reinforcement learning implementations from a Boston University senior-year RL coursework, covering the two major branches of the field: **dynamic programming on a known MDP** and **model-free control with function-free (tabular) Q-learning** in a simulated environment.
+Reinforcement learning implementations from a Boston University senior-year RL coursework, spanning the field's core paradigms: **dynamic programming** on a known MDP, **model-free temporal-difference control** (on- and off-policy) on that same MDP, and **tabular Double Q-learning** in a simulated driving environment.
 
 | File | Topic | Technique |
 |---|---|---|
 | [`418_Code_1.py`](418_Code_1.py) | Gridworld | Iterative Policy Evaluation & Value Iteration |
+| [`td_control.py`](td_control.py) | Gridworld (same MDP) | SARSA & Q-Learning (on-policy vs off-policy TD control) |
 | [`controller_doubleQ_working.py`](controller_doubleQ_working.py) | SuperTuxKart driving agent | Double Q-Learning with ε-greedy exploration |
 
 ---
@@ -31,7 +32,34 @@ python 418_Code_1.py
 
 ---
 
-## 2. SuperTuxKart Controller — Double Q-Learning
+## 2. Gridworld — SARSA vs Q-Learning (Model-Free TD Control)
+
+[`td_control.py`](td_control.py)
+
+Same 4×4 gridworld as above, but solved without a model: instead of sweeping every state with the known transition function, the agent samples one `(state, action, reward, next_state)` transition at a time by actually acting in the environment, and learns purely from that experience. Both algorithms train for 500 ε-greedy episodes (`ε = 0.1`, `α = 0.1`, `γ = 1`):
+
+- **SARSA** (on-policy) — bootstraps its update off the action it *actually* takes next, so it learns the value of the ε-greedy policy it's really following, exploration and all.
+- **Q-learning** (off-policy) — bootstraps off the *best possible* next action regardless of what the ε-greedy policy does next, so it learns the value of the greedy policy while behaving partly randomly.
+
+Both converge to essentially the same optimal values and policy as the Value Iteration solution above (small differences are ties broken differently) — a nice sanity check that a sampling-based, model-free method can recover what dynamic programming gets from a full model.
+
+<p align="center">
+  <img src="td_control_convergence.png" alt="SARSA vs Q-learning convergence" width="600"><br>
+  <img src="td_control_values.png" alt="Learned state values and greedy policy for SARSA and Q-learning" width="600">
+</p>
+
+Notice the convergence curve is *noisy* even as it trends down — unlike the DP plot's smooth, monotonic decay, TD control is learning from single sampled transitions with a fixed step size, not exact full-width sweeps.
+
+### Run it
+
+```bash
+pip install numpy matplotlib
+python td_control.py
+```
+
+---
+
+## 3. SuperTuxKart Controller — Double Q-Learning
 
 [`controller_doubleQ_working.py`](controller_doubleQ_working.py)
 
@@ -61,5 +89,5 @@ python -m controller_doubleQ_working <track_name> [<track_name> ...] [-v]
 
 ## Notes
 
-- Both scripts originate from Colab notebooks / homework scaffolding for a Boston University reinforcement learning course, cleaned up for standalone reading here.
-- No external dependencies beyond `numpy` and `matplotlib` for the gridworld exercise; the kart controller additionally requires the `pystk` simulator and course-provided `utils.py`.
+- `418_Code_1.py` and `controller_doubleQ_working.py` originate from Colab notebooks / homework scaffolding for a Boston University reinforcement learning course, cleaned up for standalone reading here; `td_control.py` is a from-scratch extension built to compare model-free TD control against the course's dynamic-programming solution on the same MDP.
+- No external dependencies beyond `numpy` and `matplotlib` for the gridworld exercises; the kart controller additionally requires the `pystk` simulator and course-provided `utils.py`.
