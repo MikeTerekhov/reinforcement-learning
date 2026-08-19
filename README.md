@@ -8,7 +8,10 @@ Reinforcement learning implementations from a Boston University senior-year RL c
 |---|---|---|
 | [`418_Code_1.py`](418_Code_1.py) | Gridworld | Iterative Policy Evaluation & Value Iteration |
 | [`td_control.py`](td_control.py) | Gridworld (same MDP) | SARSA & Q-Learning (on-policy vs off-policy TD control) |
+| [`compare_all.py`](compare_all.py) | Gridworld (same MDP) | Side-by-side check that DP and both TD methods land on the same policy |
 | [`controller_doubleQ_working.py`](controller_doubleQ_working.py) | SuperTuxKart driving agent | Double Q-Learning with ε-greedy exploration |
+
+All gridworld plots share one visual style, defined once in [`viz_common.py`](viz_common.py) and imported by the other scripts.
 
 ---
 
@@ -21,7 +24,12 @@ A classic 4×4 gridworld with two terminal (goal) states in opposite corners and
 - **Iterative Policy Evaluation** — computes the value function `V(s)` for an equiprobable random policy (25% chance of each of the four moves), using the Bellman expectation equation.
 - **Value Iteration** — simultaneously computes the optimal value function by taking the max over the four actions at each state (the Bellman optimality equation), and records the greedy action achieving that max.
 
-At selected checkpoints (iterations 1, 2, 3, 10, and 100) it prints the value grid and the optimal-action grid. It also tracks `|V_k - V_k+1|` at every state across iterations and plots the convergence curves with `matplotlib`, visually demonstrating that both algorithms converge geometrically to a fixed point.
+At selected checkpoints (iterations 1, 2, 3, 10, and 100) it prints the value grid and the optimal-action grid. It also tracks `|V_k - V_k+1|` at every state across iterations for both algorithms and saves two styled plots: a convergence curve comparing Policy Evaluation vs Value Iteration, and a pair of heatmaps of the final state values with Value Iteration's greedy policy overlaid as arrows.
+
+<p align="center">
+  <img src="dp_convergence.png" alt="Policy Evaluation vs Value Iteration convergence" width="600"><br>
+  <img src="dp_values.png" alt="DP state values and greedy policy" width="600">
+</p>
 
 ### Run it
 
@@ -59,7 +67,26 @@ python td_control.py
 
 ---
 
-## 3. SuperTuxKart Controller — Double Q-Learning
+## 3. Comparing All Three — DP vs SARSA vs Q-Learning
+
+[`compare_all.py`](compare_all.py)
+
+The sections above each show DP and TD control converging *separately*; this script puts them in one figure to make the claim checkable at a glance. It re-runs Value Iteration (a compact, ~15-line reimplementation, since a module can't be named `418_Code_1`) alongside `td_control.py`'s SARSA and Q-learning, then reports each TD method's greedy-policy agreement with Value Iteration and plots all three value/policy grids side by side.
+
+<p align="center">
+  <img src="compare_all_values.png" alt="DP vs SARSA vs Q-learning value and policy comparison" width="800">
+</p>
+
+### Run it
+
+```bash
+pip install numpy matplotlib
+python compare_all.py
+```
+
+---
+
+## 4. SuperTuxKart Controller — Double Q-Learning
 
 [`controller_doubleQ_working.py`](controller_doubleQ_working.py)
 
@@ -73,7 +100,7 @@ A tabular **Double Q-Learning** agent that learns to steer a kart in [SuperTuxKa
 
 **Exploration** — ε-greedy action selection with ε starting at `0.99` and decaying by a factor of `0.99` after every full pass over the training tracks, gradually shifting the agent from random exploration to exploiting its learned policy.
 
-**Training loop** — `test_controller` runs 100 outer loops, rolling the kart out on each provided track, timing the run, and checkpointing both Q-tables to `QvalueA.npy` / `QvalueB.npy` after every rollout so training can be inspected or resumed.
+**Training loop** — `test_controller` runs 100 outer loops, rolling the kart out on each provided track, timing the run, and checkpointing both Q-tables to `QvalueA.npy` / `QvalueB.npy` after every rollout so training can be inspected or resumed. It also tracks total reward and epsilon per loop and re-saves `training_progress.png` (reward and epsilon-decay curves on twin axes, same visual style as the gridworld plots) after every loop, so training can be monitored live without a GUI.
 
 A commented-out block at the bottom of the file preserves an earlier hand-tuned (non-learning) controller that steered directly off the arctangent of the aim point — kept for reference to show the progression from a heuristic controller to a learned one.
 
@@ -89,5 +116,6 @@ python -m controller_doubleQ_working <track_name> [<track_name> ...] [-v]
 
 ## Notes
 
-- `418_Code_1.py` and `controller_doubleQ_working.py` originate from Colab notebooks / homework scaffolding for a Boston University reinforcement learning course, cleaned up for standalone reading here; `td_control.py` is a from-scratch extension built to compare model-free TD control against the course's dynamic-programming solution on the same MDP.
-- No external dependencies beyond `numpy` and `matplotlib` for the gridworld exercises; the kart controller additionally requires the `pystk` simulator and course-provided `utils.py`.
+- `418_Code_1.py` and `controller_doubleQ_working.py` originate from Colab notebooks / homework scaffolding for a Boston University reinforcement learning course, cleaned up for standalone reading here; `td_control.py` and `compare_all.py` are from-scratch extensions built to compare model-free TD control against the course's dynamic-programming solution on the same MDP.
+- No external dependencies beyond `numpy` and `matplotlib` for the gridworld exercises; the kart controller additionally requires the `pystk` simulator and course-provided `utils.py`. Because `controller_doubleQ_working.py` is meant to be dropped into that separate course scaffold rather than run from this repo, its plotting helper duplicates a small slice of `viz_common.py`'s palette inline instead of importing it, so it stays self-contained wherever it's copied.
+- `418_Code_1.py`, `td_control.py`, and `compare_all.py` share one plotting style, defined once in `viz_common.py`.

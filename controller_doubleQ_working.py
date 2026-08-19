@@ -1,7 +1,60 @@
 import pystk
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 from .utils import PyTux
+
+# ---- chart styling, matching the gridworld scripts elsewhere in this repo ----
+INK_PRIMARY = "#0b0b0b"
+INK_SECONDARY = "#52514e"
+INK_MUTED = "#898781"
+GRID_COLOR = "#e1e0d9"
+SURFACE = "#fcfcfb"
+REWARD_COLOR = "#2a78d6"   # blue
+EPSILON_COLOR = "#c26a1d"  # amber
+
+
+def plotTrainingProgress(rewardHistory, epsilonHistory, path="training_progress.png"):
+    """Reward-per-loop and epsilon decay over training, on twin y-axes."""
+    fig, axLeft = plt.subplots(figsize=(9, 5), facecolor=SURFACE)
+    axLeft.set_facecolor(SURFACE)
+    axRight = axLeft.twinx()
+
+    axLeft.plot(rewardHistory, color=REWARD_COLOR, linewidth=2, solid_capstyle="round",
+                label="Total reward per loop")
+    axRight.plot(epsilonHistory, color=EPSILON_COLOR, linewidth=2, solid_capstyle="round",
+                 label="Epsilon (exploration rate)")
+
+    axLeft.set_title("Double Q-learning training progress", color=INK_PRIMARY, fontsize=13,
+                      loc="left", pad=12)
+    axLeft.set_xlabel("Outer loop", color=INK_SECONDARY, fontsize=10)
+    axLeft.set_ylabel("Total reward", color=REWARD_COLOR, fontsize=10)
+    axRight.set_ylabel("Epsilon", color=EPSILON_COLOR, fontsize=10)
+
+    axLeft.grid(True, color=GRID_COLOR, linewidth=1, linestyle="-")
+    axLeft.set_axisbelow(True)
+    for ax in (axLeft, axRight):
+        ax.spines["top"].set_visible(False)
+    axLeft.spines["left"].set_color(REWARD_COLOR)
+    axLeft.spines["right"].set_visible(False)
+    axLeft.spines["bottom"].set_color(GRID_COLOR)
+    axRight.spines["right"].set_color(EPSILON_COLOR)
+    axLeft.tick_params(axis="y", colors=REWARD_COLOR, labelsize=9)
+    axLeft.tick_params(axis="x", colors=INK_MUTED, labelsize=9)
+    axRight.tick_params(axis="y", colors=EPSILON_COLOR, labelsize=9)
+
+    linesLeft, labelsLeft = axLeft.get_legend_handles_labels()
+    linesRight, labelsRight = axRight.get_legend_handles_labels()
+    legend = axLeft.legend(linesLeft + linesRight, labelsLeft + labelsRight,
+                            frameon=False, loc="lower right", fontsize=9)
+    for text in legend.get_texts():
+        text.set_color(INK_SECONDARY)
+
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
 class QLearner():
     def __init__ (self):
         self.tracklength = 0
@@ -19,9 +72,10 @@ class QLearner():
         self.movement = pystk.Action()
         self.distanceLastTraveled = 0
         self.RescueTimeout = 0
+        self.totalReward = 0
         random.seed()
-    
-    
+
+
     def getReward(self, aim_point, current_vel, kart):
         self.reward = 0
         self.reward += -1
@@ -43,6 +97,7 @@ class QLearner():
         #    reward += 15
         self.actionTimeout += 1
         self.lastAimPoint = aim_point[0]
+        self.totalReward += self.reward
         return self.reward
     
     
@@ -251,9 +306,12 @@ def test_controller(pytux, tracks, verbose=False):
     run_number = 1
     loop_num = 100
     run_number += 1
+    rewardHistory = []
+    epsilonHistory = []
     for i in range(0, loop_num):
       print("LOOP " + str(i + 1))
       print(ReinLearn.epsilon)
+      ReinLearn.totalReward = 0
       for t in tracks:
           #t = pystk.Track
           steps, how_far = pytux.rollout(t, control, max_frames=10000, verbose=verbose)
@@ -262,7 +320,10 @@ def test_controller(pytux, tracks, verbose=False):
           np.save('QvalueB.npy', ReinLearn.Qvalues_B)
           #print("A: " , ReinLearn.Qvalues_A)
           #print("B: ", ReinLearn.Qvalues_B)
-          
+
+      rewardHistory.append(ReinLearn.totalReward)
+      epsilonHistory.append(ReinLearn.epsilon)
+      plotTrainingProgress(rewardHistory, epsilonHistory)
       ReinLearn.epsilon *= 0.99
     
 if __name__ == '__main__':

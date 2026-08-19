@@ -11,6 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
+from viz_common import plotSeries, plotValueGrids, PE_COLOR, DP_COLOR
+
 # discounting rate
 gamma = 1 
 
@@ -65,22 +67,28 @@ valueMap2 = np.zeros((gridSize, gridSize))
 #define the state space
 states = [[i, j] for i in range(gridSize) for j in range(gridSize)]
 
+#greedy action index (0=up,1=down,2=right,3=left) achieving opt_act at each state
+bestActionIdx = np.zeros((gridSize, gridSize), dtype=int)
+
 deltas = []
+deltasVI = []
 for it in range(numIterations):
-    
+
     #make a copy of the value function to manipulate during the algorithm
     copyValueMap = np.copy(valueMap)
     Best_Action = np.copy(valueMap2)
-    
+
     #this will be set to Vcurrent - Vnext
     deltaState = []
+    #Vcurrent - Vnext for the Value Iteration (optimal) estimate
+    deltaStateVI = []
     for state in states:
-    
+
         #the next variable will be equal to the new V iterate by the end of the process
         weightedRewards = 0
         #create reward vec
         reward_vec = []
-        
+
         #Compute the Bellman iterate
         for action in actions:
             #compute next position and reward from taking that action
@@ -93,24 +101,27 @@ for it in range(numIterations):
             #store value in a rewards vector
             reward_vec += [Rewards_opt]
 
-  
+
         #append Vcurrent-Vnext for the current state
         deltaState.append(np.abs(copyValueMap[state[0], state[1]]-weightedRewards))
-        
+
         #find action with highest reward
         opt_act = np.max(reward_vec)
+        deltaStateVI.append(np.abs(valueMap2[state[0], state[1]]-opt_act))
 
         #update the value of the next state, but in the copy rather than the original
         copyValueMap[state[0], state[1]] = weightedRewards
         Best_Action[state[0], state[1]] = opt_act
+        bestActionIdx[state[0], state[1]] = int(np.argmax(reward_vec))
 
-    #this is now an array of size numIterations, where every entry is an array of Vcurrent-Vmax    
+    #this is now an array of size numIterations, where every entry is an array of Vcurrent-Vmax
     deltas.append(deltaState)
-    
+    deltasVI.append(deltaStateVI)
+
     #update the value map with what we just computed
     valueMap = copyValueMap
     valueMap2 = Best_Action
-    
+
     #for selected iterations, print the value function
     if it in [0,1,2,9, 99, numIterations-1]:
         print("Iteration {}".format(it+1))
@@ -121,11 +132,29 @@ for it in range(numIterations):
         print("")
 
 
-        
-#plot how the deltas decay        
-plt.figure(figsize=(20, 10))
-plt.plot(deltas)
-plt.show()
+#plot how the deltas decay for both algorithms, on a shared, styled axis
+policyEvalSeries = np.array(deltas).mean(axis=1)
+valueIterSeries = np.array(deltasVI).mean(axis=1)
+plotSeries(
+    {
+        "Policy Evaluation (random policy)": (policyEvalSeries, PE_COLOR),
+        "Value Iteration (optimal policy)": (valueIterSeries, DP_COLOR),
+    },
+    title="Convergence: Policy Evaluation vs Value Iteration",
+    ylabel="Avg |ΔV(s)| across all states",
+    path="dp_convergence.png",
+    xlabel="Iteration",
+)
 
-#print(deltas)
+#heatmap of the final value function, with the greedy policy overlaid for Value Iteration
+plotValueGrids(
+    [
+        (valueMap, None, "Policy Evaluation V(s)\n(random policy)"),
+        (valueMap2, bestActionIdx, "Value Iteration V(s)\n(optimal policy)"),
+    ],
+    terminationStates,
+    path="dp_values.png",
+    suptitle="Dynamic Programming: state values and greedy policy",
+    gridSize=gridSize,
+)
 
