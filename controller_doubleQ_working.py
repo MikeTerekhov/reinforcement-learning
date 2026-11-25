@@ -73,16 +73,43 @@ class QLearner():
         self.distanceLastTraveled = 0
         self.RescueTimeout = 0
         self.totalReward = 0
+        # bookkeeping for the delayed update: the effect of an action is only
+        # observable on the NEXT frame, so we remember (state, action) until then
+        self.prevState = None
+        self.prevAction = None
+        self.lastDistance = None
         random.seed()
 
 
-    def getReward(self, aim_point, current_vel, kart):
-        self.reward = 0
-        self.reward += -1
-        #if abs(self.lastAimPoint) >= abs(aim_point[0]) and self.movement.rescue == False:
-         #   reward += 50
-        #else:
-         #   reward += -20
+    def startEpisode(self):
+        """Forget the previous frame so the first frame of a new rollout is not
+        treated as the continuation of the last one."""
+        self.prevState = None
+        self.prevAction = None
+        self.lastDistance = None
+
+
+    def getReward(self, kart):
+        """Reward for the action taken on the previous frame.
+
+        The old reward was a constant -1 per frame, which is identical for every
+        action, so the Q-tables could never prefer one action over another. Here
+        the reward is the distance gained along the track since the last frame
+        (negative when the kart goes backwards or is rescued back up the track),
+        minus a small per-frame time penalty.
+        """
+        distance = getattr(kart, 'overall_distance', None)
+        if distance is None:
+            distance = kart.distance_down_track
+        progress = 0.0 if self.lastDistance is None else distance - self.lastDistance
+        self.lastDistance = distance
+
+        self.reward = progress - 0.1
+        self.totalReward += self.reward
+        return self.reward
+
+
+    def handleRescue(self, aim_point):
         if self.movement.rescue == True:
             self.actionTimeout = 0
             #self.movement.rescue = False
@@ -97,8 +124,6 @@ class QLearner():
         #    reward += 15
         self.actionTimeout += 1
         self.lastAimPoint = aim_point[0]
-        self.totalReward += self.reward
-        return self.reward
     
     
     def getQValue(self, state, action):
@@ -120,20 +145,10 @@ class QLearner():
 
 
     def computeActionFromQValues(self, state):
-        a = -10000000000000
-        b = -10000000000000
-        
-        for i in self.actions:
-            if self.getQValue(state, i)[0] > a:
-                a = self.getQValue(state, i)[0]
-                chosenAction1 = i
-            if self.getQValue(state, i)[1] > b:
-                b = self.getQValue(state, i)[1]
-                chosenAction2 = i
-            chosen_actions = [chosenAction1, chosenAction2]
-            rand_idx = random.randint(0,1)
-
-        return chosen_actions[rand_idx]
+        # Double Q-learning acts greedily on the combined estimate Q_A + Q_B
+        s = self.states.index(state)
+        combined = self.Qvalues_A[s] + self.Qvalues_B[s]
+        return self.actions[int(np.argmax(combined))]
     
     
     def getAction(self, state):
@@ -150,36 +165,32 @@ class QLearner():
             return self.lastAction
         
     def update(self, state, action, nextState, reward):
-      if np.random.rand() < 0.5:
-        # Update (A)
-        self.Qvalues_A[self.states.index(state), self.actions.index(action)] =  self.getQValue(state, action)[0] + self.alpha *(reward + (self.gamma *self.Qvalues_B[self.states.index(nextState), self.actions.index(action)] - self.Qvalues_A[self.states.index(state), self.actions.index(action)]))
-        return self.getQValue(nextState, action)[0]
-      else:
-        # Update (B)
-        self.Qvalues_B[self.states.index(state), self.actions.index(action)] =  self.getQValue(state, action)[1] + self.alpha *(reward + (self.gamma *self.Qvalues_A[self.states.index(nextState), self.actions.index(action)] - self.Qvalues_B[self.states.index(state), self.actions.index(action)]))
-        return self.getQValue(nextState, action)[1]
-      
-    
-    
-    def getNextState(self, state, action):
-        if action[0] == "F":
-            return state
-        if action[0] == "S":
-            if action[1] == "N":
-                if (self.states.index(state) + 1) < len(self.states): 
-                    return self.states[self.states.index(state) + 1]
-                else:
-                    return state
-            else:
-                if (self.states.index(state) - 1) >= 0:
-                    return self.states[self.states.index(state) - 1]
-                else:
-                    return state
-        if action[0] == "B":
-            return state
+        """Double Q-learning update (van Hasselt, 2010).
+
+        Pick one table at random to update. That table chooses the best action
+        in the observed next state, and the OTHER table supplies that action's
+        value. Splitting "which action is best" from "how good is it" is what
+        removes the maximisation bias of ordinary Q-learning.
+        """
+        s = self.states.index(state)
+        a = self.actions.index(action)
+        ns = self.states.index(nextState)
+
+        if np.random.rand() < 0.5:
+            update_table, eval_table = self.Qvalues_A, self.Qvalues_B
+        else:
+            update_table, eval_table = self.Qvalues_B, self.Qvalues_A
+
+        best_next = int(np.argmax(update_table[ns]))
+        target = reward + self.gamma * eval_table[ns, best_next]
+        update_table[s, a] += self.alpha * (target - update_table[s, a])
     
     
     def getState(self, aim_point, aim_point2):
+        # clamp to the screen range so an aim point slightly off-screen still
+        # lands in an edge bucket instead of falling through and returning None
+        aim_point = [max(-1.0, min(1.0, aim_point[0]))] + list(aim_point[1:])
+        aim_point2 = [max(-1.0, min(1.0, aim_point2[0]))] + list(aim_point2[1:])
         if aim_point[0] >= -1 and aim_point[0] < -.80 and aim_point[0] > aim_point2[0]:
             return self.states[0]
         elif aim_point[0] >= -.80 and aim_point[0] < -.60 and aim_point[0] > aim_point2[0]:
@@ -221,6 +232,11 @@ class QLearner():
     def adjustMovement(self, action):
         if action == "F25":
             self.movement.acceleration = .25
+            self.movement.steer = 0
+            self.movement.brake = False
+            self.movement.drift = False
+        elif action == "F50":
+            self.movement.acceleration = .5
             self.movement.steer = 0
             self.movement.brake = False
             self.movement.drift = False
@@ -277,18 +293,21 @@ ReinLearn = QLearner()
 def control(aim_point, aim_point2, current_vel, kart):
     movement = ReinLearn.movement
     state = ReinLearn.getState(aim_point, aim_point2)
+
+    # The state we observe now is the real next state of last frame's action,
+    # and the reward is what that action earned. Learn from that transition
+    # before choosing this frame's action.
+    reward = ReinLearn.getReward(kart)
+    if ReinLearn.prevState is not None and ReinLearn.RescueTimeout < 3:
+        ReinLearn.update(ReinLearn.prevState, ReinLearn.prevAction, state, reward)
+
     action = ReinLearn.getAction(state)
     ReinLearn.lastAction = action
-    nextState = ReinLearn.getNextState(state, action)
     ReinLearn.adjustMovement(action)
-    reward = ReinLearn.getReward(aim_point, current_vel, kart)
-    #if abs(aim_point[0]) > .95:
-        #ReinLearn.movement.rescue = True
-    if ReinLearn.RescueTimeout < 3:
-        ReinLearn.update(state, action, nextState, reward)
-    #print(movement)
-    
+    ReinLearn.handleRescue(aim_point)
 
+    ReinLearn.prevState = state
+    ReinLearn.prevAction = action
     return movement
 
 # def test_controller(pytux, track, verbose=False):
@@ -314,6 +333,7 @@ def test_controller(pytux, tracks, verbose=False):
       ReinLearn.totalReward = 0
       for t in tracks:
           #t = pystk.Track
+          ReinLearn.startEpisode()
           steps, how_far = pytux.rollout(t, control, max_frames=10000, verbose=verbose)
           print(t.capitalize() + ": " + str((steps / 10)) + "s")
           np.save('QvalueA.npy', ReinLearn.Qvalues_A)

@@ -96,7 +96,9 @@ A tabular **Double Q-Learning** agent that learns to steer a kart in [SuperTuxKa
 
 **Action space** — 10 discrete throttle/steer combinations, e.g. `"F100"` (full throttle, straight), `"SN10"` (hard left steer), `"SP10D"` (hard right steer with drift).
 
-**Learning algorithm** — classic Double Q-Learning: two independent Q-tables (`Qvalues_A`, `Qvalues_B`) are maintained, and on each update one table is updated at random using the *other* table to bootstrap the target value. This decorrelates action selection from action evaluation and reduces the maximization bias that plagues single-table Q-learning.
+**Reward** — the distance gained along the track since the previous frame (from `kart.overall_distance`), minus a small per-frame time penalty. Going backwards, or being rescued back up the track, earns a negative reward.
+
+**Learning algorithm** — classic Double Q-Learning: two independent Q-tables (`Qvalues_A`, `Qvalues_B`) are maintained. Each frame, the agent learns from the transition it just observed: one table is picked at random, it chooses the best action in the observed next state, and the *other* table supplies that action's value as the bootstrap target. This decorrelates action selection from action evaluation and reduces the maximization bias that plagues single-table Q-learning. Greedy actions are chosen from `Qvalues_A + Qvalues_B`.
 
 **Exploration** — ε-greedy action selection with ε starting at `0.99` and decaying by a factor of `0.99` after every full pass over the training tracks, gradually shifting the agent from random exploration to exploiting its learned policy.
 
