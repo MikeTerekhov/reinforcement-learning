@@ -96,13 +96,17 @@ A tabular **Double Q-Learning** agent that learns to steer a kart in [SuperTuxKa
 
 **Action space** — 10 discrete throttle/steer combinations, e.g. `"F100"` (full throttle, straight), `"SN10"` (hard left steer), `"SP10D"` (hard right steer with drift).
 
-**Learning algorithm** — classic Double Q-Learning: two independent Q-tables (`Qvalues_A`, `Qvalues_B`) are maintained, and on each update one table is updated at random using the *other* table to bootstrap the target value. This decorrelates action selection from action evaluation and reduces the maximization bias that plagues single-table Q-learning.
+**Reward** — the distance gained along the track since the previous frame (from `kart.overall_distance`), minus a small per-frame time penalty. Going backwards, or being rescued back up the track, earns a negative reward.
+
+**Learning algorithm** — classic Double Q-Learning: two independent Q-tables (`Qvalues_A`, `Qvalues_B`) are maintained. Each frame, the agent learns from the transition it just observed: one table is picked at random, it chooses the best action in the observed next state, and the *other* table supplies that action's value as the bootstrap target. This decorrelates action selection from action evaluation and reduces the maximization bias that plagues single-table Q-learning. Greedy actions are chosen from `Qvalues_A + Qvalues_B`.
 
 **Exploration** — ε-greedy action selection with ε starting at `0.99` and decaying by a factor of `0.99` after every full pass over the training tracks, gradually shifting the agent from random exploration to exploiting its learned policy.
 
 **Training loop** — `test_controller` runs 100 outer loops, rolling the kart out on each provided track, timing the run, and checkpointing both Q-tables to `QvalueA.npy` / `QvalueB.npy` after every rollout so training can be inspected or resumed. It also tracks total reward and epsilon per loop and re-saves `training_progress.png` (reward and epsilon-decay curves on twin axes, same visual style as the gridworld plots) after every loop, so training can be monitored live without a GUI.
 
 A commented-out block at the bottom of the file preserves an earlier hand-tuned (non-learning) controller that steered directly off the arctangent of the aim point — kept for reference to show the progression from a heuristic controller to a learned one.
+
+**Try it in the browser** — [`docs/index.html`](docs/index.html) is a JavaScript port of this agent (same 18 states, 10 actions and Double Q update) on a top-down track, with a live Q-table heatmap and sliders for ε, α and γ. Open the file locally, or serve `docs/` with GitHub Pages.
 
 ### Run it
 
