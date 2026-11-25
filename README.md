@@ -106,6 +106,8 @@ A tabular **Double Q-Learning** agent that learns to steer a kart in [SuperTuxKa
 
 A commented-out block at the bottom of the file preserves an earlier hand-tuned (non-learning) controller that steered directly off the arctangent of the aim point — kept for reference to show the progression from a heuristic controller to a learned one.
 
+**Try it in the browser** — [`docs/index.html`](docs/index.html) is a JavaScript port of this agent (same 18 states, 10 actions and Double Q update) on a top-down track, with a live Q-table heatmap and sliders for ε, α and γ. Open the file locally, or serve `docs/` with GitHub Pages.
+
 ### Run it
 
 This module is designed to be dropped into the [`pystk` course homework scaffold](https://github.com/philkr/pystk) (it imports `PyTux` from a sibling `utils.py`), so it isn't runnable standalone. Within that scaffold:
